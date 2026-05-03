@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sympower Card Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: #1a1a2e; color: #fff; padding: 20px; }
+  .app { display: flex; gap: 30px; max-width: 1200px; margin: 0 auto; align-items: flex-start; }
+  .controls { flex: 0 0 320px; background: #222; border-radius: 12px; padding: 20px; }
+  h2 { font-size: 16px; margin-bottom: 16px; color: #ccc; }
+  label { display: block; font-size: 12px; color: #aaa; margin-bottom: 4px; margin-top: 12px; }
+  select, textarea { width: 100%; background: #333; border: 1px solid #444; border-radius: 6px; color: #fff; padding: 8px 10px; font-size: 13px; font-family: inherit; }
+  textarea { resize: vertical; }
+  select option { background: #333; }
+  button { margin-top: 12px; width: 100%; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; }
+  .btn-dl { background: #f5c518; color: #000; }
+  .btn-dl:disabled { background: #888; color: #444; cursor: not-allowed; }
+  .status { margin-top: 10px; font-size: 11px; padding: 6px 10px; border-radius: 6px; background: #111; color: #f39c12; }
+  .status.ok { color: #2ecc71; }
+
+  /* Card */
+  .card-outer { width: 600px; height: 600px; position: relative; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.5); flex-shrink: 0; }
+  .card-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .card-content { position: absolute; inset: 0; padding: 45px; display: flex; flex-direction: column; justify-content: center; }
+  .card-title { font-weight: 800; color: #F5C518; font-size: 44px; line-height: 1.18; margin-bottom: 18px; }
+  .card-quote-icon { font-weight: 800; font-size: 64px; color: rgba(255,213,34,0.5); line-height: 0.7; margin-bottom: 10px; margin-left: -4px; }
+  .card-quote { font-style: italic; color: rgba(255,255,255,0.92); font-size: 20px; line-height: 1.5; margin-bottom: 24px; }
+  .card-employee { display: flex; align-items: center; gap: 16px; }
+  .card-photo-wrap { width: 84px; height: 84px; border-radius: 50%; overflow: hidden; flex-shrink: 0; border: 3px solid rgba(255,255,255,0.4); }
+  .card-photo { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+  .card-name { font-weight: 700; color: #fff; font-size: 17px; }
+  .card-job { color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 3px; }
+  .note { font-size: 11px; color: #888; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="controls">
+    <h2>⚡ Sympower Card</h2>
+    <label>Employee</label>
+    <select id="empSelect" onchange="updateCard()"></select>
+    <label>Headline Title</label>
+    <textarea id="title" oninput="updateCard()" rows="3">Looking Ahead: Software Will Be BESS' Make-or-Break</textarea>
+    <label>Quote Body</label>
+    <textarea id="quote" oninput="updateCard()" rows="4">The difference between a profitable project and a stranded asset will not be the chemistry of the cells or the name on the inverter. It will be the sophistication of the digital brain managing it.</textarea>
+    <button class="btn-dl" id="dlBtn" onclick="downloadCard()">⬇️ Download PNG</button>
+    <div class="status ok" id="status">Ready</div>
+  </div>
+  <div>
+    <div class="card-outer" id="card">
+      <img class="card-bg" id="cardBg" src="https://142257164.fs1.hubspotusercontent-eu1.net/hubfs/142257164/Claude/BG%20-%20li%20post%20-%20square.png">
+      <div class="card-content">
+        <div class="card-title" id="cardTitle"></div>
+        <div class="card-quote-icon">&ldquo;</div>
+        <div class="card-quote" id="cardQuote"></div>
+        <div class="card-employee">
+          <div class="card-photo-wrap"><img class="card-photo" id="cardPhoto"></div>
+          <div>
+            <div class="card-name" id="cardName"></div>
+            <div class="card-job" id="cardJob"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="note">600×600px — select employee, edit text, download PNG</p>
+  </div>
+</div>
+
+<script>
+  const HS = 'https://142257164.fs1.hubspotusercontent-eu1.net/hubfs/142257164/Claude/';
+
+  const employees = [
+    { name: 'Daniel Trueman',        title: 'BESS Program Manager',             file: 'Daniel%20Trueman.jpg' },
+    { name: 'Take Abspoel',          title: 'BESS Program Manager',             file: 'Take%20Abspoel.jpg' },
+    { name: 'Kostas Athanasopoulos', title: 'Regional Director Greece',         file: 'Kostas%20Athanasopoulos.jpg' },
+    { name: 'Jaap van Dijk',         title: 'Head of Energy Markets & Trading', file: 'Jaap%20van%20Dijk.jpg' },
+    { name: 'Dimitris Orfanos',      title: 'Senior Key Account Manager',       file: 'Dimitris%20Orfanos.jpg' },
+    { name: 'Gijs Wolbert',          title: 'BESS Program Manager',             file: 'Gijs%20Wolbert.jpg' },
+    { name: 'Martin Brimalm',        title: 'Senior Partner Manager',           file: 'Martin%20Brimalm.jpg' },
+    { name: 'Simon Bushell',         title: 'CEO',                              file: 'Simon%20Bushell.jpg' },
+    { name: 'Oscar Karlsson',        title: 'Regional Director Finland',        file: 'Oscar%20Karlsson.jpg' },
+    { name: 'Gunnar Egidius',        title: 'Business Development Director',    file: 'Gunnar%20Egidius%20(1).jpg' },
+    { name: 'Roland Punt',           title: 'Head of Growth',                   file: 'Roland%20Punt.jpeg' },
+    { name: 'David Malmberg',        title: 'Regional Director Sweden',         file: 'David%20Malmberg.jfif' },
+  ];
+
+  // Build dropdown
+  const sel = document.getElementById('empSelect');
+  employees.forEach((e, i) => {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = `${e.name} — ${e.title}`;
+    sel.appendChild(opt);
+  });
+
+  function updateCard() {
+    const idx = parseInt(sel.value);
+    const emp = employees[idx];
+    document.getElementById('cardTitle').textContent = document.getElementById('title').value;
+    document.getElementById('cardQuote').textContent = document.getElementById('quote').value;
+    document.getElementById('cardName').textContent = emp.name;
+    document.getElementById('cardJob').textContent = emp.title;
+    document.getElementById('cardPhoto').src = HS + emp.file;
+
+    // Auto-shrink title
+    const t = document.getElementById('cardTitle');
+    t.style.fontSize = '44px';
+    let ts = 44; while (t.scrollHeight > 190 && ts > 24) { ts -= 2; t.style.fontSize = ts + 'px'; }
+
+    // Auto-shrink quote
+    const q = document.getElementById('cardQuote');
+    q.style.fontSize = '20px';
+    let qs = 20; while (q.scrollHeight > 155 && qs > 13) { qs--; q.style.fontSize = qs + 'px'; }
+  }
+
+  function downloadCard() {
+    const btn = document.getElementById('dlBtn');
+    btn.textContent = '⏳ Generating...'; btn.disabled = true;
+    html2canvas(document.getElementById('card'), { scale: 2, useCORS: true, allowTaint: false, backgroundColor: null })
+      .then(canvas => {
+        const a = document.createElement('a');
+        const emp = employees[parseInt(sel.value)];
+        a.download = `sympower-${emp.name.toLowerCase().replace(/\s+/g, '-')}.png`;
+        a.href = canvas.toDataURL('image/png'); a.click();
+        btn.textContent = '⬇️ Download PNG'; btn.disabled = false;
+      });
+  }
+
+  updateCard();
+</script>
+</body>
+</html>
